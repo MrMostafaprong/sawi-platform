@@ -1,0 +1,251 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum GroupMemberRole {
+  OWNER
+  MEMBER
+}
+
+enum UserRole {
+  USER
+  FREELANCER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BANNED
+  SUSPENDED
+}
+
+enum GroupVisibility {
+  PUBLIC
+  FEMALE_ONLY
+  PRIVATE
+  INVITE_ONLY
+}
+
+enum ReviewStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+  DISMISSED
+}
+
+enum LoginAttemptStatus {
+  SUCCESS
+  FAILED
+}
+
+enum PortfolioItemType {
+  IMAGE
+  VIDEO
+  LINK
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  username      String     @unique
+  passwordHash  String     @map("password_hash")
+  displayName   String?    @map("display_name")
+  avatarUrl     String?    @map("avatar_url")
+  bio           String?
+  role          UserRole   @default(USER)
+  status        UserStatus @default(ACTIVE)
+  isVerified    Boolean    @default(false) @map("is_verified")
+  phoneNumber   String?    @map("phone_number")
+  gender        Gender?
+  city          String?
+  currency      String?    @default("SAR")
+  lockedUntil   DateTime?  @map("locked_until")
+  skills        String[]
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  portfolio       UserPortfolio?
+  groupsCreated   Group[]         @relation("GroupCreator")
+  groupMembers    GroupMember[]
+  groupFollows    GroupFollow[]
+  groupReviews    GroupReview[]
+  reviewsGiven    Review[]        @relation("ReviewAuthor")
+  reviewsReceived Review[]        @relation("ReviewTarget")
+  reportsMade     Report[]        @relation("ReportReporter")
+  reportsReceived Report[]        @relation("ReportTarget")
+  loginAttempts   LoginAttempt[]
+
+  @@map("users")
+}
+
+model UserPortfolio {
+  id          String   @id @default(cuid())
+  userId      String   @unique @map("user_id")
+  title       String?
+  description String?
+  websiteUrl  String?  @map("website_url")
+  githubUrl   String?  @map("github_url")
+  linkedinUrl String?  @map("linkedin_url")
+  hourlyRate  Float?   @map("hourly_rate")
+  experienceYears Int? @map("experience_years")
+  showContact Boolean  @default(true) @map("show_contact")
+  resumeUrl   String?  @map("resume_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items PortfolioItem[]
+
+  @@map("user_portfolios")
+}
+
+model PortfolioItem {
+  id            String            @id @default(cuid())
+  portfolioId   String            @map("portfolio_id")
+  type          PortfolioItemType
+  url           String
+  thumbnailUrl  String?           @map("thumbnail_url")
+  caption       String?
+  fileSize      Int?              @map("file_size")
+  mimeType      String?           @map("mime_type")
+  order         Int               @default(0)
+  isApproved    Boolean           @default(false) @map("is_approved")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  portfolio UserPortfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@map("portfolio_items")
+}
+
+model Group {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  slug        String          @unique
+  visibility  GroupVisibility @default(PUBLIC)
+  creatorId   String          @map("creator_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  creator     User           @relation("GroupCreator", fields: [creatorId], references: [id])
+  members     GroupMember[]
+  follows     GroupFollow[]
+  groupReviews GroupReview[]
+
+  @@index([creatorId])
+  @@map("groups")
+}
+
+model GroupFollow {
+  id        String   @id @default(cuid())
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@map("group_follows")
+}
+
+model GroupReview {
+  id        String   @id @default(cuid())
+  groupId   String   @map("group_id")
+  userId    String   @map("user_id")
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, userId])
+  @@map("group_reviews")
+}
+
+model GroupMember {
+  id        String          @id @default(cuid())
+  groupId   String          @map("group_id")
+  userId    String          @map("user_id")
+  role      GroupMemberRole @default(MEMBER)
+  joinedAt  DateTime        @default(now()) @map("joined_at")
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
+  @@index([userId])
+  @@unique([groupId, userId])
+  @@map("group_members")
+}
+
+model Review {
+  id          String       @id @default(cuid())
+  rating      Int
+  comment     String?
+  authorId    String       @map("author_id")
+  targetId    String       @map("target_id")
+  status      ReviewStatus @default(PENDING)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  author User @relation("ReviewAuthor", fields: [authorId], references: [id])
+  target User @relation("ReviewTarget", fields: [targetId], references: [id])
+
+  @@index([authorId])
+  @@index([targetId])
+  @@unique([authorId, targetId])
+  @@map("reviews")
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  reporterId  String       @map("reporter_id")
+  targetId    String       @map("target_id")
+  reason      String
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  reporter User @relation("ReportReporter", fields: [reporterId], references: [id])
+  target   User @relation("ReportTarget", fields: [targetId], references: [id])
+
+  @@index([reporterId])
+  @@index([targetId])
+  @@map("reports")
+}
+
+model LoginAttempt {
+  id        String              @id @default(cuid())
+  userId    String              @map("user_id")
+  email     String
+  ipAddress String?             @map("ip_address")
+  userAgent String?             @map("user_agent")
+  status    LoginAttemptStatus
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("login_attempts")
+}
