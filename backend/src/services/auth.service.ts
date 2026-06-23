@@ -17,7 +17,7 @@ export class AuthService {
       throw new Error(existing.email === email ? "Email already in use" : "Username already in use");
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, env.BCRYPT_SALT_ROUNDS);
 
     const user = await prisma.user.create({
       data: { email, username, passwordHash, ...(gender ? { gender } : {}) },
@@ -27,8 +27,11 @@ export class AuthService {
     const token = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, {
       expiresIn: env.JWT_EXPIRES_IN as StringValue,
     });
+    const refreshToken = jwt.sign({ userId: user.id, role: user.role }, env.JWT_REFRESH_SECRET, {
+      expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
+    });
 
-    return { user, token };
+    return { user, token, refreshToken };
   }
 
   static async login(email: string, password: string, ipAddress?: string, userAgent?: string) {
@@ -85,11 +88,33 @@ export class AuthService {
     const token = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, {
       expiresIn: env.JWT_EXPIRES_IN as StringValue,
     });
+    const refreshToken = jwt.sign({ userId: user.id, role: user.role }, env.JWT_REFRESH_SECRET, {
+      expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
+    });
 
     return {
       user: { id: user.id, email: user.email, username: user.username, role: user.role },
       token,
+      refreshToken,
     };
+  }
+
+  static async refreshToken(token: string) {
+    try {
+      const decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as { userId: string; role: string };
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { id: true, role: true },
+      });
+      if (!user) throw new Error("User not found");
+
+      const newToken = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, {
+        expiresIn: env.JWT_EXPIRES_IN as StringValue,
+      });
+      return { token: newToken };
+    } catch {
+      throw new Error("Invalid or expired refresh token");
+    }
   }
 
   static async getMe(userId: string) {

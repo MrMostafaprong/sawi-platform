@@ -1,5 +1,51 @@
 import { body, validationResult } from "express-validator";
 import { Request, Response, NextFunction } from "express";
+import { z } from "zod";
+
+// ============================================
+// Zod Schemas (مستحسن)
+// ============================================
+
+export const registerSchema = z.object({
+  email: z.string().email("بريد إلكتروني غير صالح"),
+  username: z.string()
+    .min(3, "اسم المستخدم يجب أن يكون 3 أحرف على الأقل")
+    .max(30, "اسم المستخدم يجب أن يكون أقل من 30 حرف")
+    .regex(/^[a-zA-Z0-9_]+$/, "يمكن استخدام أحرف وأرقام وشرطة سفلية فقط"),
+  password: z.string()
+    .min(8, "كلمة المرور يجب أن تكون 8 أحرف على الأقل")
+    .max(128, "كلمة المرور طويلة جداً")
+    .regex(/[A-Z]/, "يجب أن تحتوي على حرف كبير")
+    .regex(/[0-9]/, "يجب أن تحتوي على رقم"),
+  confirmPassword: z.string(),
+  gender: z.enum(["MALE", "FEMALE"]).optional(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "كلمات المرور غير متطابقة",
+  path: ["confirmPassword"],
+});
+
+export const loginSchema = z.object({
+  email: z.string().email("بريد إلكتروني غير صالح"),
+  password: z.string().min(1, "كلمة المرور مطلوبة"),
+});
+
+export const validate = (schema: z.ZodSchema) =>
+  (req: Request, res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.body);
+    if (!result.success) {
+      res.status(422).json({
+        message: "Validation failed",
+        errors: result.error.flatten().fieldErrors,
+      });
+      return;
+    }
+    req.body = result.data;
+    next();
+  };
+
+// ============================================
+// Express-Validator (للتوافق مع الكود القديم)
+// ============================================
 
 export const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);

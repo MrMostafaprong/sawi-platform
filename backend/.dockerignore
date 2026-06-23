@@ -1,0 +1,10 @@
+.env
+.env.local
+.env.production
+node_modules
+.git
+.gitignore
+*.log
+logs
+.pgdata
+uploads
