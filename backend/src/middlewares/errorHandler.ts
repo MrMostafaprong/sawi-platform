@@ -35,7 +35,7 @@ export const errorHandler = (err: Error, req: Request, res: Response, _next: Nex
   }
 
   res.status(500).json({
-    error: isDev ? err.message : "حدث خطأ في الخادم",
+    message: isDev ? err.message : "حدث خطأ في الخادم",
     ...(isDev && { stack: err.stack }),
   });
 };

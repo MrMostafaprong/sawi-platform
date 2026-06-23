@@ -4,6 +4,9 @@ import { env } from "../config/env.js";
 import { AuthPayload, AuthRequest } from "../types/index.js";
 
 if (env.JWT_SECRET.length < 32) {
+  if (env.NODE_ENV === "production") {
+    throw new Error("JWT_SECRET too weak for production!");
+  }
   console.warn("JWT_SECRET is less than 32 characters — consider using a stronger secret");
 }
 

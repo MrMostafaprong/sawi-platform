@@ -20,6 +20,7 @@ const REFRESH_COOKIE_OPTIONS = {
 
 const clearCookieOptions = {
   httpOnly: true as const,
+  secure: env.NODE_ENV === "production",
   sameSite: (env.NODE_ENV === "production" ? "none" : "lax") as "none" | "lax",
 };
 

@@ -52,7 +52,7 @@ app.get("/api/csrf-token", (req, res) => {
   res.json({ csrfToken: generateCsrfToken(req, res, { overwrite: true }) });
 });
 
-app.use("/api/auth", authLimiter, authRoutes);
+app.use("/api/auth", authRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/groups", groupRoutes);
 app.use("/api/reviews", reviewRoutes);
