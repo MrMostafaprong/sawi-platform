@@ -7,7 +7,7 @@ import { validate, registerSchema, loginSchema } from "../middlewares/validate.j
 
 const router = Router();
 
-router.post("/register", doubleCsrfProtection, validate(registerSchema), AuthController.register);
+router.post("/register", authLimiter, doubleCsrfProtection, validate(registerSchema), AuthController.register);
 router.post("/login", authLimiter, doubleCsrfProtection, validate(loginSchema), AuthController.login);
 router.post("/refresh", authLimiter, doubleCsrfProtection, AuthController.refresh);
 router.post("/logout", doubleCsrfProtection, AuthController.logout);
