@@ -7,7 +7,7 @@ export const authorize = (...roles: UserRole[]) =>
       res.status(401).json({ error: "غير مصرح" });
       return;
     }
-    if (!roles.includes(req.user.role as UserRole)) {
+    if (!roles.includes(req.user.role)) {
       res.status(403).json({ error: "لا تملك الصلاحية" });
       return;
     }

@@ -9,14 +9,14 @@ export class ReportController {
       if (!targetId || !reason) {
         res.status(400).json({ message: "targetId and reason are required" }); return;
       }
-      const report = await ReportService.create(req.user!.userId, targetId, reason, description);
+      const report = await ReportService.create(req.user!.sub, targetId, reason, description);
       res.status(201).json({ message: "Report submitted", report });
     } catch (err) { next(err); }
   }
 
   static async myReports(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const reports = await ReportService.getMyReports(req.user!.userId);
+      const reports = await ReportService.getMyReports(req.user!.sub);
       res.json({ reports });
     } catch (err) { next(err); }
   }

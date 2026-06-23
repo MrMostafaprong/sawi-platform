@@ -89,6 +89,7 @@ model User {
   reportsMade     Report[]        @relation("ReportReporter")
   reportsReceived Report[]        @relation("ReportTarget")
   loginAttempts   LoginAttempt[]
+  refreshTokens   RefreshToken[]
 
   @@map("users")
 }
@@ -232,6 +233,19 @@ model Report {
   @@index([reporterId])
   @@index([targetId])
   @@map("reports")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique @map("token_hash")
+  userId    String   @map("user_id")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
 }
 
 model LoginAttempt {

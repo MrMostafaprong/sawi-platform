@@ -58,15 +58,18 @@ export class AuthController {
         res.status(401).json({ message: "Refresh token not provided" });
         return;
       }
-      const { token } = await AuthService.refreshToken(refreshToken);
+      const { token, refreshToken: newRefresh } = await AuthService.refreshToken(refreshToken);
       res.cookie("token", token, ACCESS_COOKIE_OPTIONS);
+      res.cookie("refresh-token", newRefresh, REFRESH_COOKIE_OPTIONS);
       res.json({ message: "Token refreshed successfully" });
     } catch (err) {
       next(err);
     }
   }
 
-  static async logout(_req: AuthRequest, res: Response) {
+  static async logout(req: AuthRequest, res: Response) {
+    const refreshToken = req.cookies?.["refresh-token"];
+    await AuthService.logout(refreshToken);
     res.clearCookie("token", clearCookieOptions);
     res.clearCookie("refresh-token", { ...clearCookieOptions, path: "/api/auth/refresh" });
     res.json({ message: "Logged out successfully" });
@@ -74,7 +77,7 @@ export class AuthController {
 
   static async me(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const user = await AuthService.getMe(req.user!.userId);
+      const user = await AuthService.getMe(req.user!.sub);
       if (!user) {
         res.status(404).json({ message: "User not found" });
         return;

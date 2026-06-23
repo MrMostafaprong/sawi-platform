@@ -5,14 +5,14 @@ import { AuthRequest } from "../types/index.js";
 export class ProfileController {
   static async getMyProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const profile = await ProfileService.getProfile(req.user!.userId);
+      const profile = await ProfileService.getProfile(req.user!.sub);
       res.json({ profile });
     } catch (err) { next(err); }
   }
 
   static async getPublicProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const profile = await ProfileService.getPublicProfile(req.params.username, req.user?.userId);
+      const profile = await ProfileService.getPublicProfile(req.params.username, req.user?.sub);
       if (!profile) {
         res.status(404).json({ message: "User not found" });
         return;
@@ -23,7 +23,7 @@ export class ProfileController {
 
   static async updateProfile(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const user = await ProfileService.updateProfile(req.user!.userId, req.body);
+      const user = await ProfileService.updateProfile(req.user!.sub, req.body);
       res.json({ message: "Profile updated", user });
     } catch (err) { next(err); }
   }
@@ -34,7 +34,7 @@ export class ProfileController {
         res.status(400).json({ message: "No file provided" });
         return;
       }
-      const item = await ProfileService.uploadMedia(req.user!.userId, req.file, req.body.caption);
+      const item = await ProfileService.uploadMedia(req.user!.sub, req.file, req.body.caption);
       res.status(201).json({ message: "Media uploaded", item });
     } catch (err) { next(err); }
   }
@@ -46,7 +46,7 @@ export class ProfileController {
         res.status(400).json({ message: "No files provided" });
         return;
       }
-      const items = await ProfileService.uploadMultipleMedia(req.user!.userId, files);
+      const items = await ProfileService.uploadMultipleMedia(req.user!.sub, files);
       res.status(201).json({ message: "Media uploaded", items });
     } catch (err) { next(err); }
   }
@@ -58,21 +58,21 @@ export class ProfileController {
         res.status(400).json({ message: "URL is required" });
         return;
       }
-      const item = await ProfileService.addLink(req.user!.userId, url, caption);
+      const item = await ProfileService.addLink(req.user!.sub, url, caption);
       res.status(201).json({ message: "Link added", item });
     } catch (err) { next(err); }
   }
 
   static async deleteMedia(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await ProfileService.deleteMedia(req.user!.userId, req.params.id);
+      await ProfileService.deleteMedia(req.user!.sub, req.params.id);
       res.json({ message: "Media deleted" });
     } catch (err) { next(err); }
   }
 
   static async toggleContactVisibility(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const portfolio = await ProfileService.toggleContactVisibility(req.user!.userId);
+      const portfolio = await ProfileService.toggleContactVisibility(req.user!.sub);
       res.json({ message: "Contact visibility toggled", showContact: portfolio.showContact });
     } catch (err) { next(err); }
   }
@@ -83,7 +83,7 @@ export class ProfileController {
         res.status(400).json({ message: "No file provided" });
         return;
       }
-      const result = await ProfileService.updateAvatar(req.user!.userId, req.file);
+      const result = await ProfileService.updateAvatar(req.user!.sub, req.file);
       res.json({ message: "Avatar updated", avatarUrl: result.avatarUrl });
     } catch (err) { next(err); }
   }
@@ -94,7 +94,7 @@ export class ProfileController {
         res.status(400).json({ message: "No file provided" });
         return;
       }
-      const result = await ProfileService.uploadResume(req.user!.userId, req.file);
+      const result = await ProfileService.uploadResume(req.user!.sub, req.file);
       res.json({ message: "تم رفع السيرة الذاتية", resumeUrl: result.resumeUrl });
     } catch (err) { next(err); }
   }

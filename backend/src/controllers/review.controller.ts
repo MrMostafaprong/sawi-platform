@@ -9,7 +9,7 @@ export class ReviewController {
       if (!targetId || !rating) {
         res.status(400).json({ message: "targetId and rating are required" }); return;
       }
-      const review = await ReviewService.create(req.user!.userId, targetId, rating, comment);
+      const review = await ReviewService.create(req.user!.sub, targetId, rating, comment);
       res.status(201).json({ message: "Review created (pending approval)", review });
     } catch (err) { next(err); }
   }
@@ -25,7 +25,7 @@ export class ReviewController {
 
   static async delete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await ReviewService.delete(req.params.id, req.user!.userId);
+      await ReviewService.delete(req.params.id, req.user!.sub);
       res.json({ message: "Review deleted" });
     } catch (err) { next(err); }
   }

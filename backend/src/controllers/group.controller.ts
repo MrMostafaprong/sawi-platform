@@ -10,14 +10,14 @@ export class GroupController {
         res.status(400).json({ message: "الاسم والخصوصية مطلوبان" });
         return;
       }
-      const group = await GroupService.create({ name, description, visibility, creatorId: req.user!.userId });
+      const group = await GroupService.create({ name, description, visibility, creatorId: req.user!.sub });
       res.status(201).json({ message: "تم إنشاء المجموعة", group });
     } catch (err) { next(err); }
   }
 
   static async getById(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const group = await GroupService.getById(req.params.id, req.user?.userId);
+      const group = await GroupService.getById(req.params.id, req.user?.sub);
       if (!group) { res.status(404).json({ message: "المجموعة غير موجودة" }); return; }
       res.json({ group });
     } catch (err) { next(err); }
@@ -25,28 +25,28 @@ export class GroupController {
 
   static async update(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const group = await GroupService.update(req.params.id, req.user!.userId, req.body);
+      const group = await GroupService.update(req.params.id, req.user!.sub, req.body);
       res.json({ message: "تم تحديث المجموعة", group });
     } catch (err) { next(err); }
   }
 
   static async delete(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await GroupService.delete(req.params.id, req.user!.userId);
+      await GroupService.delete(req.params.id, req.user!.sub);
       res.json({ message: "تم حذف المجموعة" });
     } catch (err) { next(err); }
   }
 
   static async join(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const membership = await GroupService.join(req.params.id, req.user!.userId);
+      const membership = await GroupService.join(req.params.id, req.user!.sub);
       res.json({ message: "تم الانضمام للمجموعة", membership });
     } catch (err) { next(err); }
   }
 
   static async leave(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const result = await GroupService.leave(req.params.id, req.user!.userId);
+      const result = await GroupService.leave(req.params.id, req.user!.sub);
       res.json({ message: result.deleted ? "تم حذف المجموعة (لا يوجد أعضاء)" : "تم المغادرة" });
     } catch (err) { next(err); }
   }
@@ -62,28 +62,28 @@ export class GroupController {
         visibility: visibility as string,
         page: page ? parseInt(page as string) : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
-      }, req.user?.userId);
+      }, req.user?.sub);
       res.json(result);
     } catch (err) { next(err); }
   }
 
   static async myGroups(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const groups = await GroupService.listMyGroups(req.user!.userId);
+      const groups = await GroupService.listMyGroups(req.user!.sub);
       res.json({ groups });
     } catch (err) { next(err); }
   }
 
   static async follow(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await GroupService.follow(req.params.id, req.user!.userId);
+      await GroupService.follow(req.params.id, req.user!.sub);
       res.json({ message: "تم متابعة المجموعة" });
     } catch (err) { next(err); }
   }
 
   static async unfollow(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await GroupService.unfollow(req.params.id, req.user!.userId);
+      await GroupService.unfollow(req.params.id, req.user!.sub);
       res.json({ message: "تم إلغاء متابعة المجموعة" });
     } catch (err) { next(err); }
   }
@@ -92,7 +92,7 @@ export class GroupController {
     try {
       const { rating, comment } = req.body;
       if (!rating) { res.status(400).json({ message: "Rating is required" }); return; }
-      const review = await GroupService.createGroupReview(req.params.id, req.user!.userId, rating, comment);
+      const review = await GroupService.createGroupReview(req.params.id, req.user!.sub, rating, comment);
       res.status(201).json({ message: "تم إضافة التقييم", review });
     } catch (err) { next(err); }
   }

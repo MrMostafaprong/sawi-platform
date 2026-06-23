@@ -3,8 +3,10 @@ import { Request } from "express";
 export type UserRole = "ADMIN" | "USER" | "FREELANCER";
 
 export interface AuthPayload {
-  userId: string;
-  role: string;
+  sub: string;
+  role: UserRole;
+  iat?: number;
+  exp?: number;
 }
 
 export interface AuthRequest extends Request {
