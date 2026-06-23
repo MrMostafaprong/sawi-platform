@@ -8,9 +8,24 @@ import { env } from "../config/env.js";
 
 const LOCK_THRESHOLD = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
+const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60 * 1000;
 
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function signTokens(userId: string, role: string) {
+  const token = jwt.sign({ sub: userId, role, iat: Date.now() }, env.JWT_SECRET, {
+    expiresIn: env.JWT_EXPIRES_IN as StringValue,
+  });
+  const refreshToken = jwt.sign({ sub: userId, role, iat: Date.now() }, env.JWT_REFRESH_SECRET, {
+    expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
+  });
+  return { token, refreshToken };
+}
+
+function refreshTokenExpiry() {
+  return new Date(Date.now() + REFRESH_TOKEN_TTL);
 }
 
 export class AuthService {
@@ -29,20 +44,9 @@ export class AuthService {
       select: { id: true, email: true, username: true, role: true, createdAt: true },
     });
 
-    const token = jwt.sign({ sub: user.id, role: user.role, iat: Date.now() }, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRES_IN as StringValue,
-    });
-    const refreshToken = jwt.sign({ sub: user.id, role: user.role, iat: Date.now() }, env.JWT_REFRESH_SECRET, {
-      expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
-    });
-
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const { token, refreshToken } = signTokens(user.id, user.role);
     await prisma.refreshToken.create({
-      data: {
-        tokenHash: hashToken(refreshToken),
-        userId: user.id,
-        expiresAt,
-      },
+      data: { tokenHash: hashToken(refreshToken), userId: user.id, expiresAt: refreshTokenExpiry() },
     });
 
     return { user, token, refreshToken };
@@ -90,29 +94,15 @@ export class AuthService {
     }
 
     await prisma.$transaction([
-      prisma.user.update({
-        where: { id: user.id },
-        data: { lockedUntil: null },
-      }),
+      prisma.user.update({ where: { id: user.id }, data: { lockedUntil: null } }),
       prisma.loginAttempt.create({
         data: { userId: user.id, email, ipAddress, userAgent, status: "SUCCESS" },
       }),
     ]);
 
-    const token = jwt.sign({ sub: user.id, role: user.role, iat: Date.now() }, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRES_IN as StringValue,
-    });
-    const refreshToken = jwt.sign({ sub: user.id, role: user.role, iat: Date.now() }, env.JWT_REFRESH_SECRET, {
-      expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
-    });
-
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const { token, refreshToken } = signTokens(user.id, user.role);
     await prisma.refreshToken.create({
-      data: {
-        tokenHash: hashToken(refreshToken),
-        userId: user.id,
-        expiresAt,
-      },
+      data: { tokenHash: hashToken(refreshToken), userId: user.id, expiresAt: refreshTokenExpiry() },
     });
 
     return {
@@ -130,21 +120,15 @@ export class AuthService {
       throw new Error("Invalid or expired refresh token");
     }
 
-    const tokenHash = hashToken(token);
     const stored = await prisma.refreshToken.findUnique({
-      where: { tokenHash },
+      where: { tokenHash: hashToken(token) },
     });
 
     if (!stored) {
-      // Reuse detected — someone used a token that was already rotated
-      // Revoke ALL refresh tokens for this user immediately
-      await prisma.refreshToken.deleteMany({
-        where: { userId: decoded.sub },
-      });
+      await prisma.refreshToken.deleteMany({ where: { userId: decoded.sub } });
       throw new Error("Refresh token reuse detected — all sessions revoked");
     }
 
-    // Delete the used token
     await prisma.refreshToken.delete({ where: { id: stored.id } });
 
     const user = await prisma.user.findUnique({
@@ -153,20 +137,9 @@ export class AuthService {
     });
     if (!user) throw new Error("User not found");
 
-    const newToken = jwt.sign({ sub: user.id, role: user.role, iat: Date.now() }, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRES_IN as StringValue,
-    });
-    const newRefreshToken = jwt.sign({ sub: user.id, role: user.role, iat: Date.now() }, env.JWT_REFRESH_SECRET, {
-      expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
-    });
-
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const { token: newToken, refreshToken: newRefreshToken } = signTokens(user.id, user.role);
     await prisma.refreshToken.create({
-      data: {
-        tokenHash: hashToken(newRefreshToken),
-        userId: user.id,
-        expiresAt,
-      },
+      data: { tokenHash: hashToken(newRefreshToken), userId: user.id, expiresAt: refreshTokenExpiry() },
     });
 
     return { token: newToken, refreshToken: newRefreshToken };
@@ -174,8 +147,7 @@ export class AuthService {
 
   static async logout(token: string) {
     if (!token) return;
-    const tokenHash = hashToken(token);
-    await prisma.refreshToken.deleteMany({ where: { tokenHash } });
+    await prisma.refreshToken.deleteMany({ where: { tokenHash: hashToken(token) } });
   }
 
   static async getMe(userId: string) {
