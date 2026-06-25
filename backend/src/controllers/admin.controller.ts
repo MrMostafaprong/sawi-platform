@@ -24,7 +24,7 @@ export class AdminController {
 
   static async banUser(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      await AdminService.banUser(req.params.id, req.user!.userId);
+      await AdminService.banUser(req.params.id, req.user!.sub);
       res.json({ message: "User banned" });
     } catch (err) { next(err); }
   }

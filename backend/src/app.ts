@@ -5,7 +5,7 @@ import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import { env, corsOrigins } from "./config/env.js";
 import { logger } from "./config/logger.js";
-import { apiLimiter } from "./middlewares/rateLimiter.js";
+import { apiLimiter, authLimiter } from "./middlewares/rateLimiter.js";
 import { generateCsrfToken, setSessionCookie } from "./middlewares/csrf.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import authRoutes from "./routes/auth.routes.js";
@@ -18,7 +18,20 @@ import adminRoutes from "./routes/admin.routes.js";
 
 const app = express();
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:"],
+    },
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+  },
+}));
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || corsOrigins.some((o) => origin.startsWith(o))) cb(null, true);
@@ -27,17 +40,15 @@ app.use(cors({
   credentials: true,
 }));
 app.use(apiLimiter);
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
-
 app.use(morgan("combined", {
   stream: { write: (msg: string) => logger.info(msg.trim()) },
 }));
-
 app.use(setSessionCookie);
 
 app.get("/api/csrf-token", (req, res) => {
-  // Force overwrite to ensure token is always fresh and matches current session
   res.json({ csrfToken: generateCsrfToken(req, res, { overwrite: true }) });
 });
 

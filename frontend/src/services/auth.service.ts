@@ -1,5 +1,5 @@
 import api from "./api";
-import type { AuthResponse } from "../types";
+import type { AuthResponse, User } from "../types";
 
 export const authService = {
   async register(email: string, username: string, password: string, confirmPassword: string, gender?: string) {
@@ -15,7 +15,7 @@ export const authService = {
     return res.data;
   },
   async me() {
-    const res = await api.get<AuthResponse>("/auth/me");
+    const res = await api.get<User>("/auth/me");
     return res.data;
   },
 };

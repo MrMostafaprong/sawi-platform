@@ -1,12 +1,41 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import jwt from "jsonwebtoken";
 import type { StringValue } from "ms";
 import type { Gender } from "../../generated/prisma/enums.js";
 import prisma from "../config/prisma.js";
 import { env } from "../config/env.js";
+import type { UserRole } from "../middlewares/authorize.js";
 
 const LOCK_THRESHOLD = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
+const REFRESH_TOKEN_TTL = 30 * 24 * 60 * 60 * 1000;
+
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function signTokens(userId: string, role: UserRole) {
+  const iat = Math.floor(Date.now() / 1000);
+  
+  const token = jwt.sign(
+    { sub: userId, role, iat },
+    env.JWT_SECRET,
+    { expiresIn: env.JWT_EXPIRES_IN as StringValue }
+  );
+  
+  const refreshToken = jwt.sign(
+    { sub: userId, role, iat },
+    env.JWT_REFRESH_SECRET,
+    { expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue }
+  );
+  
+  return { token, refreshToken };
+}
+
+function refreshTokenExpiry() {
+  return new Date(Date.now() + REFRESH_TOKEN_TTL);
+}
 
 export class AuthService {
   static async register(email: string, username: string, password: string, gender?: Gender | null) {
@@ -17,18 +46,19 @@ export class AuthService {
       throw new Error(existing.email === email ? "Email already in use" : "Username already in use");
     }
 
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, env.BCRYPT_SALT_ROUNDS);
 
     const user = await prisma.user.create({
       data: { email, username, passwordHash, ...(gender ? { gender } : {}) },
       select: { id: true, email: true, username: true, role: true, createdAt: true },
     });
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRES_IN as StringValue,
+    const { token, refreshToken } = signTokens(user.id, user.role);
+    await prisma.refreshToken.create({
+      data: { tokenHash: hashToken(refreshToken), userId: user.id, expiresAt: refreshTokenExpiry() },
     });
 
-    return { user, token };
+    return { user, token, refreshToken };
   }
 
   static async login(email: string, password: string, ipAddress?: string, userAgent?: string) {
@@ -73,23 +103,63 @@ export class AuthService {
     }
 
     await prisma.$transaction([
-      prisma.user.update({
-        where: { id: user.id },
-        data: { lockedUntil: null },
-      }),
+      prisma.user.update({ where: { id: user.id }, data: { lockedUntil: null } }),
       prisma.loginAttempt.create({
         data: { userId: user.id, email, ipAddress, userAgent, status: "SUCCESS" },
       }),
     ]);
 
-    const token = jwt.sign({ userId: user.id, role: user.role }, env.JWT_SECRET, {
-      expiresIn: env.JWT_EXPIRES_IN as StringValue,
+    const { token, refreshToken } = signTokens(user.id, user.role);
+    await prisma.refreshToken.create({
+      data: { tokenHash: hashToken(refreshToken), userId: user.id, expiresAt: refreshTokenExpiry() },
     });
 
     return {
       user: { id: user.id, email: user.email, username: user.username, role: user.role },
       token,
+      refreshToken,
     };
+  }
+
+  static async refreshToken(token: string) {
+    let decoded: { sub: string; role: string };
+    try {
+      decoded = jwt.verify(token, env.JWT_REFRESH_SECRET) as { sub: string; role: string };
+    } catch {
+      throw new Error("Invalid or expired refresh token");
+    }
+
+    const stored = await prisma.refreshToken.findUnique({
+      where: { tokenHash: hashToken(token) },
+    });
+
+    if (!stored) {
+      await prisma.refreshToken.deleteMany({ where: { userId: decoded.sub } });
+      throw new Error("Refresh token reuse detected — all sessions revoked");
+    }
+
+    await prisma.refreshToken.delete({ where: { id: stored.id } });
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.sub },
+      select: { id: true, role: true },
+    });
+    if (!user) throw new Error("User not found");
+
+    const { token: newToken, refreshToken: newRefreshToken } = signTokens(user.id, user.role);
+    await prisma.refreshToken.create({
+      data: { tokenHash: hashToken(newRefreshToken), userId: user.id, expiresAt: refreshTokenExpiry() },
+    });
+
+    return { token: newToken, refreshToken: newRefreshToken };
+  }
+
+  static async logout(token: string) {
+    if (!token) return;
+    const tokenHash = hashToken(token);
+    await prisma.refreshToken.deleteMany({
+      where: { tokenHash }
+    });
   }
 
   static async getMe(userId: string) {
