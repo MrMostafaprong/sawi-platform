@@ -29,7 +29,7 @@ export function getSessionIdentifier(req: Request): string {
 }
 
 const csrf = doubleCsrf({
-  getSecret: () => env.JWT_SECRET,
+  getSecret: () => env.CSRF_SECRET,
   getSessionIdentifier,
   cookieName: "csrf-token",
   cookieOptions: {

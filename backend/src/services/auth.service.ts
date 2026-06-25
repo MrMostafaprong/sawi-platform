@@ -5,6 +5,7 @@ import type { StringValue } from "ms";
 import type { Gender } from "../../generated/prisma/enums.js";
 import prisma from "../config/prisma.js";
 import { env } from "../config/env.js";
+import type { UserRole } from "../middlewares/authorize.js";
 
 const LOCK_THRESHOLD = 5;
 const LOCK_DURATION_MS = 15 * 60 * 1000;
@@ -14,13 +15,21 @@ function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-function signTokens(userId: string, role: string) {
-  const token = jwt.sign({ sub: userId, role, iat: Date.now() }, env.JWT_SECRET, {
-    expiresIn: env.JWT_EXPIRES_IN as StringValue,
-  });
-  const refreshToken = jwt.sign({ sub: userId, role, iat: Date.now() }, env.JWT_REFRESH_SECRET, {
-    expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue,
-  });
+function signTokens(userId: string, role: UserRole) {
+  const iat = Math.floor(Date.now() / 1000);
+  
+  const token = jwt.sign(
+    { sub: userId, role, iat },
+    env.JWT_SECRET,
+    { expiresIn: env.JWT_EXPIRES_IN as StringValue }
+  );
+  
+  const refreshToken = jwt.sign(
+    { sub: userId, role, iat },
+    env.JWT_REFRESH_SECRET,
+    { expiresIn: env.JWT_REFRESH_EXPIRES_IN as StringValue }
+  );
+  
   return { token, refreshToken };
 }
 
@@ -147,7 +156,10 @@ export class AuthService {
 
   static async logout(token: string) {
     if (!token) return;
-    await prisma.refreshToken.deleteMany({ where: { tokenHash: hashToken(token) } });
+    const tokenHash = hashToken(token);
+    await prisma.refreshToken.deleteMany({
+      where: { tokenHash }
+    });
   }
 
   static async getMe(userId: string) {

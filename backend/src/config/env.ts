@@ -17,6 +17,7 @@ export const env = {
   DATABASE_URL: requireEnv("DATABASE_URL", process.env["DATABASE_URL"]),
   DIRECT_URL: process.env["DIRECT_URL"],
   BCRYPT_SALT_ROUNDS: parseInt(process.env["BCRYPT_SALT_ROUNDS"] || "12", 10),
+  CSRF_SECRET: requireEnv("CSRF_SECRET", process.env["CSRF_SECRET"]),
   RATE_LIMIT_WINDOW_MS: parseInt(process.env["RATE_LIMIT_WINDOW_MS"] || "900000", 10),
   RATE_LIMIT_MAX_REQUESTS: parseInt(process.env["RATE_LIMIT_MAX_REQUESTS"] || "100", 10),
 };

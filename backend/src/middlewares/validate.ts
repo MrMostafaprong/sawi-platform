@@ -122,7 +122,7 @@ export const registerValidation = [
     .matches(/^[a-zA-Z0-9_]+$/).withMessage("Username can only contain letters, numbers, and underscores"),
   body("password")
     .isString()
-    .isLength({ min: 6, max: 128 }).withMessage("Password must be 6-128 characters"),
+    .isLength({ min: 8, max: 128 }).withMessage("Password must be 8-128 characters"),
   body("confirmPassword")
     .custom((value, { req }) => {
       if (value !== req.body.password) throw new Error("Passwords do not match");
